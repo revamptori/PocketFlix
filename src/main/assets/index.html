@@ -267,7 +267,7 @@
       grid = $(".grid"),
       player = $("video"),
       dlg = $("dialog"),
-      modes = ["All movies", "Recently added", "Continue watching"];
+      modes = ["All movies", "Recently added", "Anime", "Continue watching"];
     let movies = [],
       mode = 0,
       current = null;
@@ -305,7 +305,8 @@
         (m) =>
           m.title.toLowerCase().includes($("#search").value.toLowerCase()) &&
           (!$("#category").value || m.category === $("#category").value) &&
-          (mode !== 2 || pos(m) > 0) &&
+          (mode !== 2 || Number(m.anime) === 1) &&
+          (mode !== 3 || pos(m) > 0) &&
           (mode !== 1 || Date.now() - Number(m.added) < 30 * 86400000),
       );
       rows.sort((a, b) =>
