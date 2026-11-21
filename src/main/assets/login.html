@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Unlock PocketFlix</title
+  ><style>
+    body {
+      min-height: 90vh;
+      display: grid;
+      place-items: center;
+      background: #15121e;
+      color: white;
+      font: 16px system-ui;
+    }
+    form {
+      max-width: 340px;
+      background: #282033;
+      border: 1px solid #544662;
+      border-radius: 20px;
+      padding: 32px;
+    }
+    small {
+      letter-spacing: 0.2em;
+      color: #d5b6ff;
+    }
+    input,
+    button {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px;
+      margin: 12px 0;
+      border: 0;
+      border-radius: 8px;
+      font: inherit;
+    }
+    button {
+      background: #ccb0ff;
+      cursor: pointer;
+    }
+  </style>
+  <form>
+    <small>POCKETFLIX / PRIVATE CINEMA</small>
+    <h1>Enter the screening room.</h1>
+    <label
+      >Library password<input
+        type="password"
+        required
+        autocomplete="current-password"
+        maxlength="256" /></label
+    ><button>Unlock library</button><output></output>
+  </form>
+  <script>
+    document.querySelector("form").onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        let r = await fetch("/session", {
+          method: "POST",
+          headers: {
+            "X-PocketFlix-Key": btoa(
+              String.fromCharCode(
+                ...new TextEncoder().encode(
+                  document.querySelector("input").value,
+                ),
+              ),
+            ),
+          },
+        });
+        if (r.ok) location.replace("/");
+        else document.querySelector("output").textContent = await r.text();
+      } catch {
+        document.querySelector("output").textContent = "Server unavailable.";
+      }
+    };
+  </script>
+</html>
