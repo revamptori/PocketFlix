@@ -14,7 +14,7 @@ import org.json.*;
 public final class FeedScreen extends Activity {
 
   final Handler h = new Handler();
-  int source = 0;
+  int source = -1;
   boolean busy = false;
   TextView status, transfer;
   Button refresh, cancel, search, prev, next;
@@ -133,14 +133,22 @@ public final class FeedScreen extends Activity {
         }
       }
     );
+    queryBox.addTextChangedListener(new android.text.TextWatcher() {
+      public void beforeTextChanged(CharSequence s,int start,int count,int after) {}
+      public void afterTextChanged(android.text.Editable s) {}
+      public void onTextChanged(CharSequence s,int start,int before,int count) {
+        if(source>=0 && !busy) showRows();
+      }
+    });
     picker.setOnItemSelectedListener(
       new AdapterView.OnItemSelectedListener() {
         public void onNothingSelected(AdapterView<?> a) {}
 
         public void onItemSelected(AdapterView<?> a, View v, int i, long id) {
+          if (i==source) return;
           source = i;
           recent=false; catalogPage=null; cursors.clear();term="";order=0;
-          queryBox.setText("");sortPicker.setSelection(0);showRows();searchPage("",0,1);
+          showRows();searchPage(queryBox.getText().toString().trim(),sortPicker.getSelectedItemPosition(),1);
         }
       }
     );
@@ -158,6 +166,13 @@ public final class FeedScreen extends Activity {
     } catch (JSONException e) {
       rows = new JSONArray();
     }
+    String query=queryBox.getText().toString().trim();
+    JSONArray visible=new JSONArray();
+    for(int i=0;i<rows.length();i++) {
+      JSONObject item=rows.optJSONObject(i);
+      if(item!=null && Catalog.matchesTitle(item.optString("title"),query)) visible.put(item);
+    }
+    rows=visible; // Click indices must refer to the filtered records, not the original page.
     List<String> titles = new ArrayList<>();
     for (int i = 0; i < rows.length(); i++) titles.add(
       rows.optJSONObject(i).optString("title") + (rows.optJSONObject(i).optString("year").isEmpty()?"":" ("+rows.optJSONObject(i).optString("year")+")")
@@ -171,6 +186,14 @@ public final class FeedScreen extends Activity {
     );
     pages.setVisibility(catalogPage==null?View.GONE:View.VISIBLE);
     refresh.setText(recent?"Refresh recent RSS":"Recent RSS only");
+    if(!query.equals(term) || (recent && !query.isEmpty())) {
+      pages.setVisibility(View.GONE);
+      status.setText(rows.length()+" on this page. Tap Search for the full catalogue.");return;
+    }
+    if(catalogPage!=null&&!query.isEmpty()) {
+      prev.setEnabled(!busy && page>1); next.setEnabled(!busy && !catalogPage.optString("next").isEmpty());
+      status.setText("Page "+page+" · "+rows.length()+" title matches for “"+query+"”");return;
+    }
     if(catalogPage!=null){long total=catalogPage.optLong("total");prev.setEnabled(!busy&&page>1);next.setEnabled(!busy&&!catalogPage.optString("next").isEmpty());
       status.setText(total==0?"No matching titles. Try another feed or search.":"Page "+page+" · "+total+" matches · "+Catalog.ORDERS[order]);return;}
     if(!recent){status.setText("Enter a title or search with a blank field to browse all.");return;}
@@ -237,6 +260,8 @@ public final class FeedScreen extends Activity {
 
   void submitSearch(){
     getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(queryBox.getWindowToken(),0);
+    if(busy||source<0)return;
+    recent=false;catalogPage=null;cursors.clear();showRows();
     searchPage(queryBox.getText().toString().trim(),sortPicker.getSelectedItemPosition(),1);
   }
 
@@ -290,7 +315,7 @@ public final class FeedScreen extends Activity {
           }
           return new Runnable() {
             public void run() {
-              choose(row.optString("title"), hash, torrent);
+              choose(row.optString("title"), row.optString("id"), hash, torrent);
             }
           };
         }
@@ -298,7 +323,7 @@ public final class FeedScreen extends Activity {
     );
   }
 
-  void choose(String title, final String hash, TorrentManifest torrent) {
+  void choose(String title, final String item, final String hash, TorrentManifest torrent) {
     final List<TorrentManifest.Entry> videos = new ArrayList<>();
     for (TorrentManifest.Entry e : torrent.files)
       if (e.video() && e.size > 0) videos.add(e);
@@ -365,6 +390,12 @@ public final class FeedScreen extends Activity {
           final CheckBox anime = new CheckBox(FeedScreen.this);
           anime.setText("Add to Anime collection");
           anime.setChecked(Releases.FEEDS[source]==Catalog.Feed.ANIME);
+          LinearLayout options = new LinearLayout(FeedScreen.this);
+          options.setOrientation(1);
+          final CheckBox torrentMode = new CheckBox(FeedScreen.this);
+          torrentMode.setText("Use BitTorrent instead of direct HTTPS");
+          options.addView(torrentMode);
+          options.addView(anime);
           new AlertDialog.Builder(FeedScreen.this)
             .setTitle("Download " + indices.length + " video(s)?")
             .setMessage(
@@ -372,9 +403,9 @@ public final class FeedScreen extends Activity {
                 FeedScreen.this,
                 total
               ) +
-                " selected. BitTorrent contacts peers who can see your IP and may receive pieces while downloading. Only download files you have permission to share."
+                " selected. Direct download uses Internet Archive without peers. Optional BitTorrent contacts peers who can see your IP and may receive pieces while downloading. Only download files you have permission to share."
             )
-            .setView(anime)
+            .setView(options)
             .setNegativeButton("Cancel", null)
             .setPositiveButton(
               "Download",
@@ -388,6 +419,8 @@ public final class FeedScreen extends Activity {
                     new Intent(FeedScreen.this, Transfer.class)
                       .putExtra("hash", hash)
                       .putExtra("indices", indices)
+                      .putExtra("item", item)
+                      .putExtra("direct", !torrentMode.isChecked())
                       .putExtra("anime", anime.isChecked())
                   );
                 }

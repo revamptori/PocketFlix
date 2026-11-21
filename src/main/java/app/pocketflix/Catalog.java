@@ -15,6 +15,15 @@ final class Catalog {
   }
   static final String[] ORDERS={"Recently archived", "Newest release year", "Oldest release year"};
   static final int PAGE_SIZE=100;
+  static String normalizedTitle(String text) {
+    return java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFKC)
+      .toLowerCase(java.util.Locale.ROOT).replaceAll("[\\p{P}\\s]+", " ").trim();
+  }
+  static boolean matchesTitle(String title, String query) {
+    if(query.trim().isEmpty()) return true;
+    String needle=normalizedTitle(query);
+    return needle.isEmpty() ? title.contains(query.trim()) : normalizedTitle(title).contains(needle);
+  }
   static String searchUrl(Feed feed,String title,int order,String cursor)throws UnsupportedEncodingException {
     if(order<0 || order>=ORDERS.length) throw new IllegalArgumentException("Invalid catalogue page");
     String scope=feed==Feed.ANIME?"(collection:anime_miscellaneous OR subject:\"anime\")":"collection:"+feed.collection;
