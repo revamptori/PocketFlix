@@ -10,7 +10,7 @@ tasks.register('assembleApk') {
         def dex = new File(outDir,'classes.dex'); def apk = new File(outDir,'PocketFlix.apk')
         def src = new File(root,'src/main')
         def gen = new File(outDir, 'generated'); gen.mkdirs()
-        exec { commandLine tool('AAPT_BIN'),'package','-f','--rename-manifest-package','app.pocketflix.discovery','-J',gen,'-I',tool('ANDROID_JAR'),'-M',new File(src,'AndroidManifest.xml'),'-S',new File(src,'res'),'-A',new File(src,'assets'),'-F',apk }
+        exec { commandLine tool('AAPT_BIN'),'package','-f','--rename-manifest-package','app.pocketflix.direct','-J',gen,'-I',tool('ANDROID_JAR'),'-M',new File(src,'AndroidManifest.xml'),'-S',new File(src,'res'),'-A',new File(src,'assets'),'-F',apk }
         exec { commandLine([tool('JAVA_BIN'),'-jar',tool('ECJ_JAR'),'-encoding','UTF-8','-proc:none','-nowarn','-1.8','-bootclasspath',tool('ANDROID_JAR'),'-d',classes] + fileTree(new File(src,'java')).matching {include '**/*.java'}.files.toList() + fileTree(gen).files.toList()) }
         exec { commandLine tool('JAVA_BIN'),'-jar',tool('DX_JAR'),'--dex','--min-sdk-version=26',"--output=$dex",classes }
         exec { workingDir root; commandLine 'bash','tools/prepare-aria2.sh' }

@@ -43,7 +43,7 @@ public final class Transfer extends Service {
     );
     return new Notification.Builder(this, "transfers")
       .setSmallIcon(android.R.drawable.stat_sys_download)
-      .setContentTitle("PocketFlix · BitTorrent")
+      .setContentTitle("PocketFlix · Download")
       .setContentText(text)
       .setOngoing(true)
       .setContentIntent(open)
@@ -127,6 +127,9 @@ public final class Transfer extends Service {
         indices.append(e.index);
       }
       check();
+      if (i.getBooleanExtra("direct", false)) {
+        downloadDirect(dir, entries, i.getStringExtra("item"));
+      } else {
       File exe = new File(
         getApplicationInfo().nativeLibraryDir,
         "libaria2c.so"
@@ -164,6 +167,7 @@ public final class Transfer extends Service {
         process = builder.redirectErrorStream(true).start();
         check();
         update("Downloading " + entries.size() + " selected video(s)…");
+        String diagnostic = "";
         try (
           BufferedReader in = new BufferedReader(
             new InputStreamReader(process.getInputStream())
@@ -172,6 +176,10 @@ public final class Transfer extends Service {
           String line;
           while ((line = in.readLine()) != null) {
             check();
+            if(line.contains("errorCode=") || line.contains("[ERROR]") || line.contains("Exception:")) {
+              String clean=line.replaceAll("https?://\\S+", "[source]").replaceAll("/data/\\S+", "[local path]").trim();
+              diagnostic=clean.substring(0,Math.min(clean.length(),250));
+            }
             if (line.startsWith("[#")) {
               int end = line.indexOf(" CN:");
               update(
@@ -191,11 +199,13 @@ public final class Transfer extends Service {
         if (exit != 0) throw new IOException(
           "Transfer stopped (aria2 code " +
             exit +
-            "). Check peers, storage and network."
+            "). " + (diagnostic.isEmpty()?"Try direct HTTPS instead.":diagnostic)
         );
       } finally {
         ca.delete();
       }
+      }
+      check();
       update("Indexing completed videos…");
       Library.get(this).importTorrent(
         dir,
@@ -236,6 +246,37 @@ public final class Transfer extends Service {
     );
   }
 
+  private void downloadDirect(File root, List<TorrentManifest.Entry> entries, String item) throws Exception {
+    if (!Releases.valid(item)) throw new IOException("Invalid archive item");
+    int index = 0;
+    for (TorrentManifest.Entry e : entries) {
+      check(); index++;
+      String label="Direct HTTPS · file "+index+" of "+entries.size();
+      update(label);
+      File f=new File(root,e.path);
+      if(!f.getCanonicalPath().startsWith(root.getCanonicalPath()+File.separator))throw new IOException("Invalid destination");
+      File parent=f.getParentFile();
+      if(!parent.isDirectory() && !parent.mkdirs())throw new IOException("Cannot create download folder");
+      // The first component of multi-file metainfo is the torrent root, not an Archive file path.
+      String path=e.path.substring(e.path.indexOf('/')+1);
+      String url="https://archive.org/download/"+item+"/"+android.net.Uri.encode(path,"/");
+      javax.net.ssl.HttpsURLConnection conn=Releases.openArchive(url);
+      try {
+        long length=conn.getContentLengthLong();
+        if(length>=0 && length!=e.size)throw new IOException("Source file size changed. Refresh the release and retry.");
+        try(InputStream in=conn.getInputStream(); OutputStream out=new FileOutputStream(f)) {
+          ExactCopy.copy(in,out,e.size,new ExactCopy.Progress(){
+            long last;
+            public void bytes(long written)throws IOException {
+              check(); long now=SystemClock.elapsedRealtime();
+              if(now-last>=1000){update(label+" · "+(int)(100.0*written/e.size)+"%");last=now;}
+            }
+          });
+        }
+      } finally {conn.disconnect();}
+    }
+  }
+
   private static void exportRoots(File file) throws Exception {
     KeyStore ks = KeyStore.getInstance("AndroidCAStore");
     ks.load(null);
@@ -247,7 +288,7 @@ public final class Transfer extends Service {
         );
         if (cert != null) {
           out.println("-----BEGIN CERTIFICATE-----");
-          out.println(
+          out.print(
             android.util.Base64.encodeToString(
               cert.getEncoded(),
               android.util.Base64.DEFAULT

@@ -30,7 +30,7 @@ final class Releases {
     return c.getSharedPreferences("subscriptions", 0);
   }
 
-  static byte[] fetch(String address, int limit) throws Exception {
+  static HttpsURLConnection openArchive(String address) throws IOException {
     URL url = new URL(address);
     for (int hop = 0; hop < 6; hop++) {
       if (
@@ -46,31 +46,33 @@ final class Releases {
         c.setReadTimeout(20000);
         c.setInstanceFollowRedirects(false);
         c.setRequestProperty("User-Agent", "PocketFlix/1.1 (feed reader)");
+        c.setRequestProperty("Accept-Encoding", "identity");
         int code = c.getResponseCode();
         if (code >= 300 && code < 400) {
           url = new URL(url, c.getHeaderField("Location"));
+          c.disconnect();
           continue;
         }
         if (code != 200) throw new IOException("Source returned HTTP " + code);
-        try (
-          InputStream in = c.getInputStream();
-          ByteArrayOutputStream out = new ByteArrayOutputStream()
-        ) {
-          byte[] b = new byte[16384];
-          int n;
-          while ((n = in.read(b)) != -1) {
-            if (out.size() + n > limit) throw new IOException(
-              "Source document too large"
-            );
-            out.write(b, 0, n);
-          }
-          return out.toByteArray();
-        }
-      } finally {
+        return c; // Caller owns and disconnects the successful response.
+      } catch (IOException | RuntimeException e) {
         c.disconnect();
+        throw e;
       }
     }
     throw new IOException("Too many redirects");
+  }
+
+  static byte[] fetch(String address, int limit) throws Exception {
+    HttpsURLConnection c = openArchive(address);
+    try (InputStream in=c.getInputStream(); ByteArrayOutputStream out=new ByteArrayOutputStream()) {
+      byte[] b=new byte[16384]; int n;
+      while ((n=in.read(b))!=-1) {
+        if(out.size()+n>limit) throw new IOException("Source document too large");
+        out.write(b,0,n);
+      }
+      return out.toByteArray();
+    } finally { c.disconnect(); }
   }
 
   static synchronized void refresh(Context c, int source) throws Exception {
