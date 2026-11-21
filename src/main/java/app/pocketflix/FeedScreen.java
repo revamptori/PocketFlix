@@ -19,6 +19,10 @@ public final class FeedScreen extends Activity {
   TextView status, transfer;
   Button refresh, cancel, search, prev, next;
   LinearLayout pages;
+  EditText queryBox;
+  Spinner sortPicker;
+  boolean recent;
+  final List<String> cursors = new ArrayList<>();
   JSONObject catalogPage;
   String term="";
   int order, page;
@@ -50,7 +54,7 @@ public final class FeedScreen extends Activity {
     text(root, "Release feeds", 29).setTypeface(null, Typeface.BOLD);
     text(
       root,
-      "Internet Archive subscriptions. Refreshing lists titles only; you decide what to download.",
+      "Browse the full collection or search by title. Nothing downloads until you choose it.",
       14
     );
     picker = new Spinner(this);
@@ -70,7 +74,7 @@ public final class FeedScreen extends Activity {
     refresh.setOnClickListener(
       new View.OnClickListener() {
         public void onClick(View v) {
-          if(catalogPage!=null){catalogPage=null;showRows();}else load();
+          if (!recent) { recent=true; catalogPage=null; cursors.clear(); showRows(); load(); } else load();
         }
       }
     );
@@ -90,9 +94,14 @@ public final class FeedScreen extends Activity {
         }
       }
     );
-    search = new Button(this);
-    search.setText("Browse or search full catalogue");root.addView(search);
-    search.setOnClickListener(new View.OnClickListener(){public void onClick(View v){searchDialog();}});
+    LinearLayout searchBar=new LinearLayout(this);root.addView(searchBar);
+    queryBox=new EditText(this);queryBox.setSingleLine();queryBox.setHint("Search catalogue by title");
+    searchBar.addView(queryBox,new LinearLayout.LayoutParams(0,-2,1));
+    search=new Button(this);search.setText("Search");searchBar.addView(search);
+    search.setOnClickListener(new View.OnClickListener(){public void onClick(View v){submitSearch();}});
+    queryBox.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+    queryBox.setOnEditorActionListener(new TextView.OnEditorActionListener(){public boolean onEditorAction(TextView v,int action,android.view.KeyEvent e){if(action!=android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH)return false;submitSearch();return true;}});
+    sortPicker=new Spinner(this);sortPicker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,Catalog.ORDERS));root.addView(sortPicker);
     pages=new LinearLayout(this);root.addView(pages);
     prev=new Button(this);next=new Button(this);prev.setText("Previous");next.setText("Next");pages.addView(prev);pages.addView(next);
     prev.setOnClickListener(new View.OnClickListener(){public void onClick(View v){searchPage(term,order,page-1);}});
@@ -130,13 +139,8 @@ public final class FeedScreen extends Activity {
 
         public void onItemSelected(AdapterView<?> a, View v, int i, long id) {
           source = i;
-          catalogPage=null;term="";order=0;
-          showRows();
-          if (
-            System.currentTimeMillis() -
-              Releases.prefs(FeedScreen.this).getLong("time" + i, 0) >
-            30 * 60000L
-          ) load();
+          recent=false; catalogPage=null; cursors.clear();term="";order=0;
+          queryBox.setText("");sortPicker.setSelection(0);showRows();searchPage("",0,1);
         }
       }
     );
@@ -148,7 +152,7 @@ public final class FeedScreen extends Activity {
 
   void showRows() {
     try {
-      rows = catalogPage!=null ? catalogPage.getJSONArray("rows") : new JSONArray(
+      rows = catalogPage!=null ? catalogPage.getJSONArray("rows") : !recent ? new JSONArray() : new JSONArray(
         Releases.prefs(this).getString("rows" + source, "[]")
       );
     } catch (JSONException e) {
@@ -166,22 +170,23 @@ public final class FeedScreen extends Activity {
       )
     );
     pages.setVisibility(catalogPage==null?View.GONE:View.VISIBLE);
-    refresh.setText(catalogPage==null?"Refresh feed":"Back to feed");
-    if(catalogPage!=null){long total=catalogPage.optLong("total");prev.setEnabled(!busy&&page>1);next.setEnabled(!busy&&(long)page*Catalog.PAGE_SIZE<total);
+    refresh.setText(recent?"Refresh recent RSS":"Recent RSS only");
+    if(catalogPage!=null){long total=catalogPage.optLong("total");prev.setEnabled(!busy&&page>1);next.setEnabled(!busy&&!catalogPage.optString("next").isEmpty());
       status.setText(total==0?"No matching titles. Try another feed or search.":"Page "+page+" · "+total+" matches · "+Catalog.ORDERS[order]);return;}
+    if(!recent){status.setText("Enter a title or search with a blank field to browse all.");return;}
     long when = Releases.prefs(this).getLong("time" + source, 0);
     status.setText(
       when == 0
         ? "No cached releases"
         : rows.length() +
-            " releases · updated " +
+            " recent RSS entries (not the full catalogue) · updated " +
             java.text.DateFormat.getDateTimeInstance().format(new Date(when))
     );
   }
 
   void working(boolean b) {
     busy = b;
-    search.setEnabled(!b); if(b){prev.setEnabled(false);next.setEnabled(false);}
+    queryBox.setEnabled(!b); sortPicker.setEnabled(!b);search.setEnabled(!b); if(b){prev.setEnabled(false);next.setEnabled(false);}
     refresh.setEnabled(!b);
     picker.setEnabled(!b);
     list.setEnabled(!b);
@@ -230,16 +235,22 @@ public final class FeedScreen extends Activity {
     ).start();
   }
 
-  void searchDialog(){
-    LinearLayout form=new LinearLayout(this);form.setOrientation(1);form.setPadding(dp(20),dp(8),dp(20),0);
-    final EditText input=new EditText(this);input.setSingleLine();input.setHint("Title (leave blank to browse)");input.setText(term);form.addView(input);
-    final Spinner sort=new Spinner(this);sort.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,Catalog.ORDERS));sort.setSelection(order);form.addView(sort);
-    new AlertDialog.Builder(this).setTitle(Releases.FEEDS[source].label+" catalogue").setView(form).setNegativeButton("Cancel",null).setPositiveButton("Browse",new DialogInterface.OnClickListener(){public void onClick(DialogInterface d,int w){searchPage(input.getText().toString(),sort.getSelectedItemPosition(),1);}}).show();
+  void submitSearch(){
+    getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(queryBox.getWindowToken(),0);
+    searchPage(queryBox.getText().toString().trim(),sortPicker.getSelectedItemPosition(),1);
   }
+
   void searchPage(final String query,final int sort,final int number){
     final int feed=source;
+    final String cursor=number==1?"":number<=cursors.size()?cursors.get(number-1):catalogPage.optString("next");
+    if(number>1&&cursor.isEmpty())return;
     runTask("Searching archive metadata…",new Operation(){public Runnable perform()throws Exception{
-      final JSONObject result=Releases.search(feed,query,sort,number);return new Runnable(){public void run(){term=query;order=sort;page=number;catalogPage=result;showRows();}};
+      final JSONObject result=Releases.search(feed,query,sort,cursor);
+      return new Runnable(){public void run(){
+        // Only advance the navigation state after a successful response.
+        while(cursors.size()>=number)cursors.remove(cursors.size()-1);
+        cursors.add(cursor);term=query;order=sort;page=number;catalogPage=result;recent=false;showRows();
+      }};
     }});
   }
 

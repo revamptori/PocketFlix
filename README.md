@@ -1,20 +1,20 @@
 # PocketFlix Server
 
-**[Download PocketFlix 1.2 (signed APK)](deliverables/PocketFlix-1.2.apk)** · Android 8.0 (API 26) or newer · no root or compilation required.
+**[Download PocketFlix 1.3 (signed APK)](deliverables/PocketFlix-1.3.apk)** · Android 8.0 (API 26) or newer · no root or compilation required.
 
 ## Discover movies and anime
 
-1. Install **PocketFlix** and open **Library → Browse release feeds**. Six Internet Archive RSS feeds are configured: Feature films, Anime, Silent films, Sci-fi & horror, Comedy films, and Animation & cartoons. Use **Browse or search full catalogue** to look beyond the latest RSS entries. Search by title or leave it blank, sort by recently archived or release year, then page through the results. Anime catalogue search also includes videos tagged with the Anime subject. No feed URL, torrent client, account or server setup is required.
+1. Install **PocketFlix** and open **Library → Browse release feeds**. Six Internet Archive RSS feeds are configured: Feature films, Anime, Silent films, Sci-fi & horror, Comedy films, and Animation & cartoons. The full catalogue opens by default. Type a title and tap **Search**, or leave it blank to browse the collection. Select a sort before searching. **Next** follows the archive’s continuation cursor until the source runs out of results; the 100-item page size is not a total limit. **Recent RSS only** switches to the shorter publisher-provided list. Anime catalogue search also includes videos tagged with the Anime subject. No feed URL, torrent client, account or server setup is required.
 2. Select a feed and tap a release to read its torrent file list. **No video is checked by default.** Pick one episode, several files, or **All episodes** (Anime) or **Select all** for the videos in that release. Review the size and tap **Download**. A pack can include alternate encodings as well as episodes. Availability depends on the feed, peers and web seeds; this is not a search of every movie ever released.
 3. The phone downloads only the selected video files and indexes them on completion. Anime releases default to the **Anime collection**; you can change that on the confirmation screen or later in **Manage movie**. Use **Anime collection only** on the phone or **Anime** in the browser. One transfer runs at a time, independently of the streaming server. Cancel from the release screen or notification. Cancelling discards partial files.
 
 RSS updates only fetch listings. Opening a stale feed or tapping **Refresh feed** checks it immediately; **Background updates** schedules metadata refreshes roughly every six hours on an unmetered network, subject to Android scheduling. Turning that option off does not disable manual browsing. Feed discovery needs internet; local library streaming still works without it. BitTorrent exposes your IP to peers and may upload pieces during an active download. Use content you have permission to share. No automatic post-download seeding is requested.
 
-**Existing installations:** This APK installs beside [PocketFlix 1.1.1](deliverables/PocketFlix-1.1.1.apk), [PocketFlix 1.0](deliverables/PocketFlix.apk) and [PocketFlix Feeds 1.1](deliverables/PocketFlix-Feeds.apk), rather than overwriting them, because the previous build's signing key is not available. Your original library stays intact. Re-select any local videos you want in the new app. Stop the old server before using the same port in the new app.
+**Existing installations:** This APK installs beside [PocketFlix 1.2](deliverables/PocketFlix-1.2.apk), [PocketFlix 1.1.1](deliverables/PocketFlix-1.1.1.apk), [PocketFlix 1.0](deliverables/PocketFlix.apk) and [PocketFlix Feeds 1.1](deliverables/PocketFlix-Feeds.apk), rather than overwriting them, because the previous build's signing key is not available. Your original library stays intact. Re-select any local videos you want in the new app. Stop the old server before using the same port in the new app.
 
 ## Install and watch
 
-1. Open `PocketFlix-1.2.apk` on the **host phone**. If Android prompts, allow **Install unknown apps** for the browser or file manager you opened it with. You can turn that permission off after installation.
+1. Open `PocketFlix-1.3.apk` on the **host phone**. If Android prompts, allow **Install unknown apps** for the browser or file manager you opened it with. You can turn that permission off after installation.
 2. Open **PocketFlix** and allow notifications so the server controls appear in the notification drawer. Connect the phone and viewer devices to the same trusted Wi-Fi.
 3. Tap **Upload movies** and choose one or more local videos. Wait for **Library updated**. In **Library → Manage movie**, edit titles, descriptions and categories or remove entries. Removing a movie never deletes the original document.
 4. Tap **Start server**, then **Copy website URL**. Open that exact `http://` URL on a viewer device. No viewer app is needed. If the address changes, copy the new one. Guest Wi-Fi with client isolation can prevent connections.
@@ -27,9 +27,9 @@ RSS updates only fetch listings. Opening a stale feed or tapping **Refresh feed*
 
 ## Build and verification
 
-The delivered APK was built with Gradle 8.10.2 using `tools/offline.gradle` (ECJ → DX → Android SDK resource packager → alignment and APK signing). Its v2/v3 signatures and ZIP alignment were verified. **SHA-256:** `126ad7e684a2c7ebaeecc8ddbcff3576f6b16f9de033176c312aa99e923fa050`.
+The delivered APK was built with Gradle 8.10.2 using `tools/offline.gradle` (ECJ → DX → Android SDK resource packager → alignment and APK signing). Its v2/v3 signatures and ZIP alignment were verified. **SHA-256:** `a69b276cdc91d198d90bb718f485355be5489e90631ed4d94a41084c649b767a`.
 
-For maintainers, the root Android Gradle Plugin project uses JDK 17 and Android SDK 34 (`./gradlew assembleDebug`). The application uses native Java Android views, SQLite, SAF, a `specialUse` foreground service and vendored NanoHTTPD 2.3.1. The feed edition also bundles the aria2 BitTorrent worker for ARM, ARM64, x86 and x86-64. The build fetches hash-pinned native artifacts via `tools/prepare-aria2.sh` (bash, curl and sha256sum). Attribution and license are included in the APK. `app.pocketflix.catalog` is the side-by-side package ID of the distributed offline build.
+For maintainers, the root Android Gradle Plugin project uses JDK 17 and Android SDK 34 (`./gradlew assembleDebug`). The application uses native Java Android views, SQLite, SAF, a `specialUse` foreground service and vendored NanoHTTPD 2.3.1. The feed edition also bundles the aria2 BitTorrent worker for ARM, ARM64, x86 and x86-64. The build fetches hash-pinned native artifacts via `tools/prepare-aria2.sh` (bash, curl and sha256sum). Attribution and license are included in the APK. `app.pocketflix.discovery` is the side-by-side package ID of the distributed offline build.
 
 | Check | Result |
 |---|---|
