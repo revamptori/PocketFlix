@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>PocketFlix · Screening room</title
+  ><style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #101016;
+      color: #faf7ff;
+      font:
+        16px system-ui,
+        sans-serif;
+    }
+    header,
+    main,
+    footer {
+      max-width: 1280px;
+      margin: auto;
+      padding: 20px clamp(18px, 5vw, 72px);
+    }
+    header,
+    .bar,
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    header {
+      justify-content: space-between;
+      border-bottom: 1px solid #ffffff1a;
+    }
+    .brand {
+      font-size: 23px;
+      font-weight: 800;
+      letter-spacing: -1.4px;
+    }
+    .brand b {
+      background: #b69efa;
+      color: #171020;
+      border-radius: 9px;
+      padding: 3px 8px;
+      margin-right: 6px;
+    }
+    .badge,
+    small {
+      font: 700 11px/1.5 system-ui;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      color: #cebaff;
+    }
+    .badge {
+      color: #b4e4c8;
+    }
+    .hero {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      background: linear-gradient(110deg, #36294f, #302641 54%, #70588c);
+      border: 1px solid #ffffff22;
+      border-radius: 20px;
+      padding: clamp(28px, 6vw, 74px);
+      margin-bottom: 32px;
+    }
+    .hero:after {
+      content: "▶";
+      position: absolute;
+      z-index: -1;
+      right: -0.08em;
+      bottom: -0.45em;
+      font: 900 clamp(190px, 30vw, 390px) system-ui;
+      color: #ffffff0e;
+      transform: rotate(-13deg);
+    }
+    h1 {
+      font:
+        normal clamp(42px, 7vw, 84px)/0.97 Georgia,
+        serif;
+      letter-spacing: -0.06em;
+      margin: 18px 0;
+    }
+    h1 i {
+      color: #ddc8ff;
+    }
+    p,
+    footer {
+      color: #bdb7c8;
+    }
+    .hero p {
+      max-width: 42ch;
+    }
+    .bar {
+      justify-content: space-between;
+    }
+    button,
+    input,
+    select {
+      color: inherit;
+      font: inherit;
+      background: #25232f;
+      border: 1px solid #ffffff22;
+      border-radius: 9px;
+      padding: 10px 14px;
+    }
+    button,
+    select {
+      cursor: pointer;
+    }
+    button:focus-visible,
+    input:focus,
+    select:focus {
+      outline: 2px solid #c7abff;
+    }
+    nav {
+      margin: 14px 0;
+    }
+    nav button {
+      font-size: 14px;
+      border-radius: 24px;
+    }
+    button.active {
+      background: #c5aafa;
+      color: #20172c;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(158px, 45%), 1fr));
+      gap: 18px;
+    }
+    .tile {
+      padding: 0;
+      border: 0;
+      background: none;
+      text-align: left;
+      min-width: 0;
+    }
+    .poster {
+      border-radius: 12px;
+      aspect-ratio: 2/3;
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(150deg, #44344f, #262136 60%, #624471);
+      font: italic 70px Georgia;
+      color: #d6b8eb;
+    }
+    .poster img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .tile strong {
+      display: block;
+      margin: 10px 0 4px;
+      overflow-wrap: anywhere;
+    }
+    .tile:hover .poster {
+      outline: 2px solid #bea2ea;
+    }
+    .poster em {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 4px;
+      background: #c8a5ff;
+    }
+    .empty {
+      grid-column: 1/-1;
+      padding: 32px;
+      border: 1px dashed #ffffff30;
+      border-radius: 12px;
+      color: #c5bdcf;
+    }
+    footer {
+      font-size: 12px;
+      margin-top: 40px;
+    }
+    dialog {
+      width: min(760px, 94vw);
+      background: #201d29;
+      color: white;
+      border: 1px solid #595064;
+      border-radius: 16px;
+      padding: 20px;
+    }
+    dialog::backdrop {
+      background: #000c;
+    }
+    video {
+      width: 100%;
+      max-height: 55vh;
+      background: black;
+      border-radius: 8px;
+    }
+    h2 {
+      letter-spacing: -0.04em;
+    }
+    input,
+    select {
+      max-width: 100%;
+    }
+    @media (max-width: 680px) {
+      .bar input {
+        width: 100%;
+      }
+      .hero {
+        margin-bottom: 16px;
+      }
+      .grid {
+        gap: 12px;
+      }
+    }
+  </style>
+  <header>
+    <span class="brand"><b>▸</b>PocketFlix</span
+    ><span class="badge">● &nbsp; Local screening room</span>
+  </header>
+  <main>
+    <section class="hero">
+      <small>POCKETFLIX &nbsp; / &nbsp; PRIVATE CINEMA</small>
+      <h1>Your movies.<br /><i>Now showing.</i></h1>
+      <p>
+        A screening room for the films on your phone. Choose a title and settle
+        in.
+      </p>
+    </section>
+    <div class="bar">
+      <h2>Movie library</h2>
+      <input
+        id="search"
+        type="search"
+        placeholder="Search by title…"
+        aria-label="Search movies"
+      /><select id="category" aria-label="Category">
+        <option value="">All categories</option></select
+      ><select id="sort" aria-label="Sort movies">
+        <option value="date">Newest first</option>
+        <option value="name">Title A–Z</option>
+        <option value="length">Longest first</option>
+      </select>
+    </div>
+    <nav></nav>
+    <section class="grid" aria-live="polite"></section>
+  </main>
+  <footer>
+    POCKETFLIX &nbsp; / &nbsp; Streamed directly from your local server
+  </footer>
+  <dialog>
+    <div class="bar">
+      <h2 id="title"></h2>
+      <button id="close">Close ✕</button>
+    </div>
+    <video controls playsinline></video>
+    <p id="info"></p>
+    <p id="note"></p>
+  </dialog>
+  <script>
+    const $ = (s) => document.querySelector(s),
+      grid = $(".grid"),
+      player = $("video"),
+      dlg = $("dialog"),
+      modes = ["All movies", "Recently added", "Continue watching"];
+    let movies = [],
+      mode = 0,
+      current = null;
+    function pos(m) {
+      try {
+        return Number(localStorage.getItem("pf:" + m.id)) || 0;
+      } catch {
+        return 0;
+      }
+    }
+    function save(n) {
+      if (current)
+        try {
+          localStorage.setItem("pf:" + current.id, n);
+        } catch {}
+    }
+    function el(t, s) {
+      let e = document.createElement(t);
+      if (s !== undefined) e.textContent = s;
+      return e;
+    }
+    modes.forEach((s, i) => {
+      let b = el("button", s);
+      b.onclick = () => {
+        mode = i;
+        render();
+      };
+      $("nav").append(b);
+    });
+    function render() {
+      [...$("nav").children].forEach((b, i) =>
+        b.classList.toggle("active", i === mode),
+      );
+      let rows = movies.filter(
+        (m) =>
+          m.title.toLowerCase().includes($("#search").value.toLowerCase()) &&
+          (!$("#category").value || m.category === $("#category").value) &&
+          (mode !== 2 || pos(m) > 0) &&
+          (mode !== 1 || Date.now() - Number(m.added) < 30 * 86400000),
+      );
+      rows.sort((a, b) =>
+        $("#sort").value === "name"
+          ? a.title.localeCompare(b.title)
+          : $("#sort").value === "length"
+            ? b.duration - a.duration
+            : b.added - a.added,
+      );
+      grid.replaceChildren();
+      for (const m of rows) {
+        let tile = el("button"),
+          p = el("div", m.title.charAt(0)),
+          im = new Image();
+        tile.className = "tile";
+        p.className = "poster";
+        im.loading = "lazy";
+        im.alt = "";
+        im.onerror = () => im.remove();
+        im.src = "/poster/" + m.id;
+        p.append(im);
+        if (pos(m) && m.duration) {
+          let line = el("em");
+          line.style.width =
+            Math.min(100, (pos(m) * 100000) / m.duration) + "%";
+          p.append(line);
+        }
+        tile.append(p, el("strong", m.title), el("small", m.category));
+        tile.onclick = () => play(m);
+        grid.append(tile);
+      }
+      if (!rows.length) {
+        let e = el(
+          "p",
+          movies.length
+            ? "No titles in this view."
+            : "Your screening room is ready. Upload movies from the PocketFlix dashboard to begin.",
+        );
+        e.className = "empty";
+        grid.append(e);
+      }
+    }
+    function play(m) {
+      current = m;
+      $("#title").textContent = m.title;
+      $("#info").textContent = [
+        m.category,
+        Math.round(m.size / 1048576) + " MB",
+        m.description,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      $("#note").textContent =
+        "Playback depends on your browser’s codec support. H.264/AAC MP4 is widely compatible.";
+      dlg.showModal();
+      player.src = "/media/" + m.id;
+      player.onloadedmetadata = () => {
+        let n = pos(m);
+        if (n > 0 && n < player.duration - 1) player.currentTime = n;
+      };
+      player.play().catch(() => {});
+    }
+    player.ontimeupdate = () => {
+      if (!player.paused && player.currentTime > 0) save(player.currentTime);
+    };
+    player.onended = () => save(0);
+    player.onseeked = () => {
+      if (current && !player.ended) save(player.currentTime);
+    };
+    function heartbeat() {
+      if (current && !player.paused) fetch("/watching").catch(() => {});
+    }
+    player.onplaying = heartbeat;
+    setInterval(heartbeat, 10000);
+    player.onerror = () => {
+      if (current)
+        $("#note").textContent =
+          "Cannot play this file. Check that the original is available, or try a browser that supports its video and audio codecs.";
+    };
+    $("#close").onclick = () => dlg.close();
+    dlg.onclose = () => {
+      player.pause();
+      current = null;
+      player.removeAttribute("src");
+      player.load();
+      render();
+    };
+    for (let id of ["search", "category", "sort"]) $("#" + id).oninput = render;
+    async function load() {
+      try {
+        let r = await fetch("/library");
+        if (r.status === 401) return location.reload();
+        if (!r.ok) throw Error();
+        movies = await r.json();
+        let sel = $("#category"),
+          val = sel.value;
+        sel.replaceChildren(new Option("All categories", ""));
+        for (const c of new Set(movies.map((m) => m.category).filter(Boolean)))
+          sel.add(new Option(c, c));
+        sel.value = val;
+        render();
+      } catch {
+        grid.textContent =
+          "Library unavailable. Check the server and Wi-Fi connection.";
+      }
+    }
+    load();
+    setInterval(() => {
+      if (!document.hidden && !current) load();
+    }, 15000);
+  </script>
+</html>
