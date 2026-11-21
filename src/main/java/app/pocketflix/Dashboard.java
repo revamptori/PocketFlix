@@ -127,13 +127,25 @@ public class Dashboard extends Activity {
     return l;
   }
 
+  // Draw icons as resources, independent of the phone's text font and locale.
+  void icon(TextView label, int resource, int size) {
+    if (Integer.valueOf(resource).equals(label.getTag())) return;
+    android.graphics.drawable.Drawable drawable = getDrawable(resource);
+    drawable.setBounds(0, 0, dp(size), dp(size));
+    label.setCompoundDrawablesRelative(drawable, null, null, null);
+    label.setCompoundDrawablePadding(dp(8));
+    label.setTag(resource);
+  }
+
   void draw() {
     drawnRevision = revision;
     root = col();
     root.setBackgroundColor(bg);
     root.setPadding(dp(16), dp(12), dp(16), dp(8));
     setContentView(root);
-    text(root, "◈  PocketFlix", 22, white).setTypeface(null, Typeface.BOLD);
+    TextView brand = text(root, "PocketFlix", 22, white);
+    brand.setTypeface(null, Typeface.BOLD);
+    icon(brand, R.drawable.mark, 24);
     ScrollView sc = new ScrollView(this);
     root.addView(sc, new LinearLayout.LayoutParams(-1, 0, 1));
     body = col();
@@ -288,23 +300,25 @@ public class Dashboard extends Activity {
     if (tab != 0 || toggle == null) return;
     MoviesHttp s = Host.server;
     String ip = Lan.ip();
-    toggle.setText(s == null ? "▶   Start server" : "■   Stop server");
+    toggle.setText(s == null ? "Start server" : "Stop server");
+    icon(toggle, s == null ? R.drawable.start : R.drawable.stop, 18);
+    icon(status, s == null ? R.drawable.offline : R.drawable.online, 12);
     status.setText(
       s == null
         ? Host.error.isEmpty()
-          ? "●  Offline"
+          ? "Offline"
           : Host.error
-        : "●  Server online"
+        : "Server online"
     );
     addr.setText(ip == null ? "Waiting for Wi-Fi or Ethernet" : url(ip));
     copy.setEnabled(ip != null);
     metrics.setText(
       movies +
-        " movies   ·   " +
+        " movies  |  " +
         size(bytes) +
         " indexed\n" +
         (s == null ? 0 : s.clients()) +
-        " streaming devices   ·   " +
+        " streaming devices  |  " +
         (s == null
           ? "Not broadcasting"
           : android.text.format.DateUtils.formatElapsedTime(
@@ -314,9 +328,9 @@ public class Dashboard extends Activity {
   }
 
   void upload() {
-    btn(
+    Button upload = btn(
       body,
-      "＋   Upload movies",
+      "Upload movies",
       new Runnable() {
         public void run() {
           Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT)
@@ -327,6 +341,7 @@ public class Dashboard extends Activity {
         }
       }
     );
+    icon(upload, R.drawable.upload, 18);
     progress = text(body, importing, 13, dim);
   }
 
