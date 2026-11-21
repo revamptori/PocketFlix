@@ -1,7 +1,7 @@
 plugins { id 'com.android.application' version '8.7.3' }
 android { namespace 'app.pocketflix'; compileSdk 34
  packaging { jniLibs { useLegacyPackaging = true; keepDebugSymbols += ["**/libaria2c.so"] } }
- defaultConfig { applicationId 'app.pocketflix'; minSdk 26; targetSdk 34; versionCode 4; versionName '1.2' }
+ defaultConfig { applicationId 'app.pocketflix'; minSdk 26; targetSdk 34; versionCode 5; versionName '1.3' }
 }
 
 tasks.register("prepareTorrentEngine", Exec) { commandLine "bash", "tools/prepare-aria2.sh" }

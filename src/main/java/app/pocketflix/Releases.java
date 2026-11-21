@@ -15,15 +15,15 @@ final class Releases {
 
   static final Catalog.Feed[] FEEDS=Catalog.Feed.values();
 
-  static JSONObject search(int source,String title,int order,int page)throws Exception {
-    byte[] data=fetch(Catalog.searchUrl(FEEDS[source],title,order,page),2*1024*1024);
-    JSONObject result=new JSONObject(new String(data,java.nio.charset.StandardCharsets.UTF_8)).getJSONObject("response");
-    JSONArray docs=result.getJSONArray("docs"), rows=new JSONArray();
+  static JSONObject search(int source,String title,int order,String cursor)throws Exception {
+    byte[] data=fetch(Catalog.searchUrl(FEEDS[source],title,order,cursor),2*1024*1024);
+    JSONObject result=new JSONObject(new String(data,java.nio.charset.StandardCharsets.UTF_8));
+    JSONArray docs=result.getJSONArray("items"), rows=new JSONArray();
     for(int i=0;i<docs.length();i++){
       JSONObject doc=docs.getJSONObject(i); String id=doc.optString("identifier");
       if(valid(id))rows.put(new JSONObject().put("id",id).put("title",doc.optString("title",id)).put("year",doc.optString("year","")));
     }
-    return new JSONObject().put("rows",rows).put("total",result.getLong("numFound"));
+    return new JSONObject().put("rows",rows).put("total",result.getLong("total")).put("next",result.isNull("cursor")?"":result.getString("cursor"));
   }
 
   static SharedPreferences prefs(Context c) {
@@ -121,7 +121,6 @@ final class Releases {
             new JSONObject().put("title", title).put("id", id)
           );
         }
-        if (rows.length() >= 100) break;
       }
     }
     if (!rss) throw new IOException("Not an RSS feed");
