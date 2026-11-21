@@ -25,6 +25,7 @@ public class Dashboard extends Activity {
   Library lib;
   Handler h = new Handler();
   SharedPreferences prefs;
+  boolean animeOnly;
   int tab;
   static volatile int revision;
   int drawnRevision;
@@ -44,6 +45,9 @@ public class Dashboard extends Activity {
     prefs = getSharedPreferences("config", 0);
     getWindow().setStatusBarColor(bg);
     getWindow().setNavigationBarColor(bg);
+    if (Releases.prefs(this).getBoolean("updates", true)) FeedJob.schedule(
+      this
+    );
     draw();
     if (
       Build.VERSION.SDK_INT >= 33 &&
@@ -186,7 +190,29 @@ public class Dashboard extends Activity {
         metrics = text(card(), "", 16, white);
         upload();
       } else if (tab == 1) {
+        btn(
+          body,
+          "Browse release feeds",
+          new Runnable() {
+            public void run() {
+              startActivity(new Intent(Dashboard.this, FeedScreen.class));
+            }
+          }
+        );
         upload();
+        CheckBox filter = new CheckBox(this);
+        filter.setText("Anime collection only");
+        filter.setChecked(animeOnly);
+        body.addView(filter);
+        filter.setOnCheckedChangeListener(
+          new CompoundButton.OnCheckedChangeListener() {
+            public void onCheckedChanged(CompoundButton b, boolean on) {
+              animeOnly = on;
+              draw();
+            }
+          }
+        );
+        int shown = 0;
         if (movies == 0) text(
           card(),
           "Your collection is empty. Select videos to make them available to nearby browsers.",
@@ -195,6 +221,8 @@ public class Dashboard extends Activity {
         );
         for (int j = 0; j < movies; j++) {
           final JSONObject o = a.getJSONObject(j);
+          if (animeOnly && o.optInt("anime") == 0) continue;
+          shown++;
           LinearLayout l = card();
           text(
             l,
@@ -213,6 +241,12 @@ public class Dashboard extends Activity {
             }
           );
         }
+        if (animeOnly && shown == 0 && movies > 0) text(
+          card(),
+          "No anime yet. Mark a title in Manage movie or select Anime when downloading.",
+          16,
+          dim
+        );
       } else settings();
     } catch (Exception e) {
       toast(e.toString());
@@ -358,6 +392,10 @@ public class Dashboard extends Activity {
     EditText t = field(l, "Title", o.optString("title")),
       g = field(l, "Category", o.optString("category")),
       d = field(l, "Description", o.optString("description"));
+    final CheckBox anime = new CheckBox(this);
+    anime.setText("Anime collection");
+    anime.setChecked(o.optInt("anime") != 0);
+    l.addView(anime);
     new AlertDialog.Builder(Dashboard.this)
       .setTitle("Movie details")
       .setView(l)
@@ -371,6 +409,7 @@ public class Dashboard extends Activity {
             v.put("title", title);
             v.put("category", g.getText().toString());
             v.put("description", d.getText().toString());
+            v.put("anime", anime.isChecked() ? 1 : 0);
             lib
               .getWritableDatabase()
               .update("movies", v, "id=?", new String[] { o.optString("id") });

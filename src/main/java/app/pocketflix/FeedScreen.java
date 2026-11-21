@@ -1,0 +1,377 @@
+package app.pocketflix;
+
+import android.app.*;
+import android.content.*;
+import android.graphics.Typeface;
+import android.os.*;
+import android.view.*;
+import android.widget.*;
+import java.io.*;
+import java.util.*;
+import org.json.*;
+
+/** Subscriptions show releases; the only transfer entry point is the confirmation dialog. */
+public final class FeedScreen extends Activity {
+
+  final Handler h = new Handler();
+  int source = 0;
+  boolean busy = false;
+  TextView status, transfer;
+  Button refresh, cancel;
+  Spinner picker;
+  ListView list;
+  JSONArray rows = new JSONArray();
+
+  int dp(int n) {
+    return Math.round(getResources().getDisplayMetrics().density * n);
+  }
+
+  TextView text(LinearLayout l, String value, int size) {
+    TextView v = new TextView(this);
+    v.setText(value);
+    v.setTextSize(size);
+    v.setPadding(0, dp(4), 0, dp(4));
+    l.addView(v);
+    return v;
+  }
+
+  public void onCreate(Bundle b) {
+    super.onCreate(b);
+    LinearLayout root = new LinearLayout(this);
+    root.setOrientation(1);
+    root.setPadding(dp(16), dp(12), dp(16), 0);
+    root.setBackgroundColor(0xff17141f);
+    setContentView(root);
+    text(root, "POCKETFLIX  /  DISCOVERY", 12).setTextColor(0xffc6afff);
+    text(root, "Release feeds", 29).setTypeface(null, Typeface.BOLD);
+    text(
+      root,
+      "Internet Archive subscriptions. Refreshing lists titles only; you decide what to download.",
+      14
+    );
+    picker = new Spinner(this);
+    picker.setAdapter(
+      new ArrayAdapter<String>(
+        this,
+        android.R.layout.simple_spinner_dropdown_item,
+        Releases.LABELS
+      )
+    );
+    root.addView(picker);
+    LinearLayout bar = new LinearLayout(this);
+    root.addView(bar);
+    refresh = new Button(this);
+    refresh.setText("Refresh feed");
+    bar.addView(refresh);
+    refresh.setOnClickListener(
+      new View.OnClickListener() {
+        public void onClick(View v) {
+          load();
+        }
+      }
+    );
+    CheckBox updates = new CheckBox(this);
+    updates.setText("Background updates");
+    updates.setChecked(Releases.prefs(this).getBoolean("updates", true));
+    bar.addView(updates);
+    updates.setOnCheckedChangeListener(
+      new CompoundButton.OnCheckedChangeListener() {
+        public void onCheckedChanged(CompoundButton b, boolean on) {
+          Releases.prefs(FeedScreen.this)
+            .edit()
+            .putBoolean("updates", on)
+            .apply();
+          if (on) FeedJob.schedule(FeedScreen.this);
+          else FeedJob.cancel(FeedScreen.this);
+        }
+      }
+    );
+    status = text(root, "", 13);
+    transfer = text(root, "", 13);
+    cancel = new Button(this);
+    cancel.setText("Cancel transfer");
+    root.addView(cancel);
+    cancel.setOnClickListener(
+      new View.OnClickListener() {
+        public void onClick(View v) {
+          startService(
+            new Intent(FeedScreen.this, Transfer.class).setAction("cancel")
+          );
+        }
+      }
+    );
+    list = new ListView(this);
+    root.addView(list, new LinearLayout.LayoutParams(-1, 0, 1));
+    list.setOnItemClickListener(
+      new AdapterView.OnItemClickListener() {
+        public void onItemClick(AdapterView<?> a, View v, int i, long id) {
+          if (!busy && !Transfer.active) preview(rows.optJSONObject(i));
+          else if (Transfer.active) msg(
+            "Finish or cancel the active download first"
+          );
+        }
+      }
+    );
+    picker.setOnItemSelectedListener(
+      new AdapterView.OnItemSelectedListener() {
+        public void onNothingSelected(AdapterView<?> a) {}
+
+        public void onItemSelected(AdapterView<?> a, View v, int i, long id) {
+          source = i;
+          showRows();
+          if (
+            System.currentTimeMillis() -
+              Releases.prefs(FeedScreen.this).getLong("time" + i, 0) >
+            30 * 60000L
+          ) load();
+        }
+      }
+    );
+  }
+
+  private void msg(String s) {
+    Toast.makeText(this, s, Toast.LENGTH_LONG).show();
+  }
+
+  void showRows() {
+    try {
+      rows = new JSONArray(
+        Releases.prefs(this).getString("rows" + source, "[]")
+      );
+    } catch (JSONException e) {
+      rows = new JSONArray();
+    }
+    List<String> titles = new ArrayList<>();
+    for (int i = 0; i < rows.length(); i++) titles.add(
+      rows.optJSONObject(i).optString("title")
+    );
+    list.setAdapter(
+      new ArrayAdapter<String>(
+        this,
+        android.R.layout.simple_list_item_1,
+        titles
+      )
+    );
+    long when = Releases.prefs(this).getLong("time" + source, 0);
+    status.setText(
+      when == 0
+        ? "No cached releases"
+        : rows.length() +
+            " releases · updated " +
+            java.text.DateFormat.getDateTimeInstance().format(new Date(when))
+    );
+  }
+
+  void working(boolean b) {
+    busy = b;
+    refresh.setEnabled(!b);
+    picker.setEnabled(!b);
+    list.setEnabled(!b);
+  }
+
+  interface Operation {
+    Runnable perform() throws Exception;
+  }
+
+  void runTask(String s, final Operation op) {
+    if (busy) return;
+    working(true);
+    status.setText(s);
+    new Thread(
+      new Runnable() {
+        public void run() {
+          try {
+            final Runnable done = op.perform();
+            h.post(
+              new Runnable() {
+                public void run() {
+                  if (isFinishing() || isDestroyed()) return;
+                  working(false);
+                  showRows();
+                  done.run();
+                }
+              }
+            );
+          } catch (final Exception e) {
+            h.post(
+              new Runnable() {
+                public void run() {
+                  if (isFinishing() || isDestroyed()) return;
+                  working(false);
+                  showRows();
+                  status.setText(
+                    "Unavailable: " + e.getMessage() + ". Try again later."
+                  );
+                }
+              }
+            );
+          }
+        }
+      },
+      "Release reader"
+    ).start();
+  }
+
+  void load() {
+    final int s = source;
+    runTask(
+      "Checking RSS metadata…",
+      new Operation() {
+        public Runnable perform() throws Exception {
+          Releases.refresh(FeedScreen.this, s);
+          return new Runnable() {
+            public void run() {}
+          };
+        }
+      }
+    );
+  }
+
+  void preview(final JSONObject row) {
+    if (row == null) return;
+    runTask(
+      "Reading torrent file list (no video download)…",
+      new Operation() {
+        public Runnable perform() throws Exception {
+          final byte[] data = Releases.metadata(row.getString("id"));
+          final TorrentManifest torrent = new TorrentManifest(data);
+          final String hash = Releases.hash(data);
+          File[] old = getCacheDir().listFiles();
+          if (old != null) for (File f : old)
+            if (
+              f.getName().matches("[a-f0-9]{64}\\.torrent") &&
+              f.lastModified() < System.currentTimeMillis() - 86400000L
+            ) f.delete();
+          File cache = new File(getCacheDir(), hash + ".torrent");
+          try (FileOutputStream out = new FileOutputStream(cache)) {
+            out.write(data);
+          }
+          return new Runnable() {
+            public void run() {
+              choose(row.optString("title"), hash, torrent);
+            }
+          };
+        }
+      }
+    );
+  }
+
+  void choose(String title, final String hash, TorrentManifest torrent) {
+    final List<TorrentManifest.Entry> videos = new ArrayList<>();
+    for (TorrentManifest.Entry e : torrent.files)
+      if (e.video() && e.size > 0) videos.add(e);
+    if (videos.isEmpty()) {
+      msg("This release has no supported video files");
+      return;
+    }
+    String[] labels = new String[videos.size()];
+    final boolean[] chosen = new boolean[labels.length];
+    for (int n = 0; n < labels.length; n++) {
+      TorrentManifest.Entry e = videos.get(n);
+      labels[n] =
+        e.path +
+        " · " +
+        android.text.format.Formatter.formatShortFileSize(this, e.size);
+    }
+    final AlertDialog d = new AlertDialog.Builder(this)
+      .setTitle(title)
+      .setMultiChoiceItems(
+        labels,
+        chosen,
+        new DialogInterface.OnMultiChoiceClickListener() {
+          public void onClick(DialogInterface d, int which, boolean on) {
+            chosen[which] = on;
+          }
+        }
+      )
+      .setNegativeButton("Cancel", null)
+      .setNeutralButton("Select all", null)
+      .setPositiveButton("Review", null)
+      .create();
+    d.show();
+    d.getButton(-3).setOnClickListener(
+      new View.OnClickListener() {
+        public void onClick(View v) {
+          for (int n = 0; n < chosen.length; n++) {
+            chosen[n] = true;
+            d.getListView().setItemChecked(n, true);
+          }
+        }
+      }
+    );
+    d.getButton(-1).setOnClickListener(
+      new View.OnClickListener() {
+        public void onClick(View v) {
+          ArrayList<Integer> ids = new ArrayList<>();
+          long total = 0;
+          for (int n = 0; n < chosen.length; n++) if (chosen[n]) {
+            TorrentManifest.Entry e = videos.get(n);
+            if (e.size > Long.MAX_VALUE - total) {
+              msg("Selection too large");
+              return;
+            }
+            ids.add(e.index);
+            total += e.size;
+          }
+          if (ids.isEmpty()) {
+            msg("Choose one or more videos first");
+            return;
+          }
+          final int[] indices = new int[ids.size()];
+          for (int n = 0; n < indices.length; n++) indices[n] = ids.get(n);
+          d.dismiss();
+          final CheckBox anime = new CheckBox(FeedScreen.this);
+          anime.setText("Add to Anime collection");
+          anime.setChecked(source == 1);
+          new AlertDialog.Builder(FeedScreen.this)
+            .setTitle("Download " + indices.length + " video(s)?")
+            .setMessage(
+              android.text.format.Formatter.formatShortFileSize(
+                FeedScreen.this,
+                total
+              ) +
+                " selected. BitTorrent contacts peers who can see your IP and may receive pieces while downloading. Only download files you have permission to share."
+            )
+            .setView(anime)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton(
+              "Download",
+              new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface d, int w) {
+                  if (Transfer.active) {
+                    msg("Another download is active");
+                    return;
+                  }
+                  startForegroundService(
+                    new Intent(FeedScreen.this, Transfer.class)
+                      .putExtra("hash", hash)
+                      .putExtra("indices", indices)
+                      .putExtra("anime", anime.isChecked())
+                  );
+                }
+              }
+            )
+            .show();
+        }
+      }
+    );
+  }
+
+  final Runnable tick = new Runnable() {
+    public void run() {
+      transfer.setText(Transfer.status(FeedScreen.this));
+      cancel.setVisibility(Transfer.active ? View.VISIBLE : View.GONE);
+      h.postDelayed(this, 1000);
+    }
+  };
+
+  public void onResume() {
+    super.onResume();
+    h.post(tick);
+  }
+
+  public void onPause() {
+    h.removeCallbacks(tick);
+    super.onPause();
+  }
+}

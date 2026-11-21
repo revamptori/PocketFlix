@@ -11,8 +11,10 @@ tasks.register('assembleApk') {
         def src = new File(root,'src/main')
         exec { commandLine([tool('JAVA_BIN'),'-jar',tool('ECJ_JAR'),'-proc:none','-nowarn','-1.8','-bootclasspath',tool('ANDROID_JAR'),'-d',classes] + fileTree(new File(src,'java')).matching {include '**/*.java'}.files.toList()) }
         exec { commandLine tool('JAVA_BIN'),'-jar',tool('DX_JAR'),'--dex','--min-sdk-version=26',"--output=$dex",classes }
-        exec { commandLine tool('AAPT_BIN'),'package','-f','-I',tool('ANDROID_JAR'),'-M',new File(src,'AndroidManifest.xml'),'-S',new File(src,'res'),'-A',new File(src,'assets'),'-F',apk }
-        exec { workingDir outDir; commandLine 'zip','-q',apk,'classes.dex' }
+        exec { workingDir root; commandLine 'bash','tools/prepare-aria2.sh' }
+        exec { commandLine tool('AAPT_BIN'),'package','-f','--rename-manifest-package','app.pocketflix.feeds','-I',tool('ANDROID_JAR'),'-M',new File(src,'AndroidManifest.xml'),'-S',new File(src,'res'),'-A',new File(src,'assets'),'-F',apk }
+        copy { from new File(src,'jniLibs'); into new File(outDir,'lib') }
+        exec { workingDir outDir; commandLine 'zip','-qr',apk,'classes.dex','lib' }
         exec { commandLine tool('JAVA_BIN'),'-jar',tool('SIGNER_JAR'),'-a',apk,'--ks',tool('SIGNING_KEYSTORE'),'--ksAlias','pocketflix','--ksPass',tool('SIGNING_PASSWORD'),'--ksKeyPass',tool('SIGNING_PASSWORD'),'--overwrite' }
     }
 }
