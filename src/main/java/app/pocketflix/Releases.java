@@ -13,11 +13,18 @@ import org.xmlpull.v1.XmlPullParser;
 /** Feed refresh only exchanges RSS metadata. No path from this class starts a download. */
 final class Releases {
 
-  static final String[] LABELS = { "Feature films", "Anime" };
-  static final String[] COLLECTIONS = {
-    "feature_films",
-    "anime_miscellaneous",
-  };
+  static final Catalog.Feed[] FEEDS=Catalog.Feed.values();
+
+  static JSONObject search(int source,String title,int order,int page)throws Exception {
+    byte[] data=fetch(Catalog.searchUrl(FEEDS[source],title,order,page),2*1024*1024);
+    JSONObject result=new JSONObject(new String(data,java.nio.charset.StandardCharsets.UTF_8)).getJSONObject("response");
+    JSONArray docs=result.getJSONArray("docs"), rows=new JSONArray();
+    for(int i=0;i<docs.length();i++){
+      JSONObject doc=docs.getJSONObject(i); String id=doc.optString("identifier");
+      if(valid(id))rows.put(new JSONObject().put("id",id).put("title",doc.optString("title",id)).put("year",doc.optString("year","")));
+    }
+    return new JSONObject().put("rows",rows).put("total",result.getLong("numFound"));
+  }
 
   static SharedPreferences prefs(Context c) {
     return c.getSharedPreferences("subscriptions", 0);
@@ -69,7 +76,7 @@ final class Releases {
   static synchronized void refresh(Context c, int source) throws Exception {
     byte[] data = fetch(
       "https://archive.org/services/collection-rss.php?collection=" +
-        COLLECTIONS[source],
+        FEEDS[source].collection,
       2 * 1024 * 1024
     );
     XmlPullParser p = Xml.newPullParser();

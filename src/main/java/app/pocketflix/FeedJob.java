@@ -31,7 +31,7 @@ public final class FeedJob extends JobService {
           boolean failed = false;
           for (
             int i = 0;
-            i < Releases.COLLECTIONS.length && gen == generation;
+            i < Releases.FEEDS.length && gen == generation;
             i++
           ) try {
             Releases.refresh(FeedJob.this, i);

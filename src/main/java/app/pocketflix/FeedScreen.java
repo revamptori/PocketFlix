@@ -17,7 +17,11 @@ public final class FeedScreen extends Activity {
   int source = 0;
   boolean busy = false;
   TextView status, transfer;
-  Button refresh, cancel;
+  Button refresh, cancel, search, prev, next;
+  LinearLayout pages;
+  JSONObject catalogPage;
+  String term="";
+  int order, page;
   Spinner picker;
   ListView list;
   JSONArray rows = new JSONArray();
@@ -51,10 +55,10 @@ public final class FeedScreen extends Activity {
     );
     picker = new Spinner(this);
     picker.setAdapter(
-      new ArrayAdapter<String>(
+      new ArrayAdapter<Catalog.Feed>(
         this,
         android.R.layout.simple_spinner_dropdown_item,
-        Releases.LABELS
+        Releases.FEEDS
       )
     );
     root.addView(picker);
@@ -66,7 +70,7 @@ public final class FeedScreen extends Activity {
     refresh.setOnClickListener(
       new View.OnClickListener() {
         public void onClick(View v) {
-          load();
+          if(catalogPage!=null){catalogPage=null;showRows();}else load();
         }
       }
     );
@@ -86,6 +90,14 @@ public final class FeedScreen extends Activity {
         }
       }
     );
+    search = new Button(this);
+    search.setText("Browse or search full catalogue");root.addView(search);
+    search.setOnClickListener(new View.OnClickListener(){public void onClick(View v){searchDialog();}});
+    pages=new LinearLayout(this);root.addView(pages);
+    prev=new Button(this);next=new Button(this);prev.setText("Previous");next.setText("Next");pages.addView(prev);pages.addView(next);
+    prev.setOnClickListener(new View.OnClickListener(){public void onClick(View v){searchPage(term,order,page-1);}});
+    next.setOnClickListener(new View.OnClickListener(){public void onClick(View v){searchPage(term,order,page+1);}});
+    pages.setVisibility(View.GONE);
     status = text(root, "", 13);
     transfer = text(root, "", 13);
     cancel = new Button(this);
@@ -118,6 +130,7 @@ public final class FeedScreen extends Activity {
 
         public void onItemSelected(AdapterView<?> a, View v, int i, long id) {
           source = i;
+          catalogPage=null;term="";order=0;
           showRows();
           if (
             System.currentTimeMillis() -
@@ -135,7 +148,7 @@ public final class FeedScreen extends Activity {
 
   void showRows() {
     try {
-      rows = new JSONArray(
+      rows = catalogPage!=null ? catalogPage.getJSONArray("rows") : new JSONArray(
         Releases.prefs(this).getString("rows" + source, "[]")
       );
     } catch (JSONException e) {
@@ -143,7 +156,7 @@ public final class FeedScreen extends Activity {
     }
     List<String> titles = new ArrayList<>();
     for (int i = 0; i < rows.length(); i++) titles.add(
-      rows.optJSONObject(i).optString("title")
+      rows.optJSONObject(i).optString("title") + (rows.optJSONObject(i).optString("year").isEmpty()?"":" ("+rows.optJSONObject(i).optString("year")+")")
     );
     list.setAdapter(
       new ArrayAdapter<String>(
@@ -152,6 +165,10 @@ public final class FeedScreen extends Activity {
         titles
       )
     );
+    pages.setVisibility(catalogPage==null?View.GONE:View.VISIBLE);
+    refresh.setText(catalogPage==null?"Refresh feed":"Back to feed");
+    if(catalogPage!=null){long total=catalogPage.optLong("total");prev.setEnabled(!busy&&page>1);next.setEnabled(!busy&&(long)page*Catalog.PAGE_SIZE<total);
+      status.setText(total==0?"No matching titles. Try another feed or search.":"Page "+page+" · "+total+" matches · "+Catalog.ORDERS[order]);return;}
     long when = Releases.prefs(this).getLong("time" + source, 0);
     status.setText(
       when == 0
@@ -164,6 +181,7 @@ public final class FeedScreen extends Activity {
 
   void working(boolean b) {
     busy = b;
+    search.setEnabled(!b); if(b){prev.setEnabled(false);next.setEnabled(false);}
     refresh.setEnabled(!b);
     picker.setEnabled(!b);
     list.setEnabled(!b);
@@ -210,6 +228,19 @@ public final class FeedScreen extends Activity {
       },
       "Release reader"
     ).start();
+  }
+
+  void searchDialog(){
+    LinearLayout form=new LinearLayout(this);form.setOrientation(1);form.setPadding(dp(20),dp(8),dp(20),0);
+    final EditText input=new EditText(this);input.setSingleLine();input.setHint("Title (leave blank to browse)");input.setText(term);form.addView(input);
+    final Spinner sort=new Spinner(this);sort.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,Catalog.ORDERS));sort.setSelection(order);form.addView(sort);
+    new AlertDialog.Builder(this).setTitle(Releases.FEEDS[source].label+" catalogue").setView(form).setNegativeButton("Cancel",null).setPositiveButton("Browse",new DialogInterface.OnClickListener(){public void onClick(DialogInterface d,int w){searchPage(input.getText().toString(),sort.getSelectedItemPosition(),1);}}).show();
+  }
+  void searchPage(final String query,final int sort,final int number){
+    final int feed=source;
+    runTask("Searching archive metadata…",new Operation(){public Runnable perform()throws Exception{
+      final JSONObject result=Releases.search(feed,query,sort,number);return new Runnable(){public void run(){term=query;order=sort;page=number;catalogPage=result;showRows();}};
+    }});
   }
 
   void load() {
@@ -285,7 +316,7 @@ public final class FeedScreen extends Activity {
         }
       )
       .setNegativeButton("Cancel", null)
-      .setNeutralButton("Select all", null)
+      .setNeutralButton(Releases.FEEDS[source]==Catalog.Feed.ANIME?"All episodes":"Select all", null)
       .setPositiveButton("Review", null)
       .create();
     d.show();
@@ -322,7 +353,7 @@ public final class FeedScreen extends Activity {
           d.dismiss();
           final CheckBox anime = new CheckBox(FeedScreen.this);
           anime.setText("Add to Anime collection");
-          anime.setChecked(source == 1);
+          anime.setChecked(Releases.FEEDS[source]==Catalog.Feed.ANIME);
           new AlertDialog.Builder(FeedScreen.this)
             .setTitle("Download " + indices.length + " video(s)?")
             .setMessage(
